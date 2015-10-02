@@ -2,7 +2,8 @@
 
 namespace Bolt;
 
-use Bolt\Debug\DebugToolbarEnabler;
+use Bolt\Events\ControllerEvents;
+use Bolt\Events\MountEvent;
 use Bolt\Exception\LowlevelException;
 use Bolt\Helpers\Str;
 use Bolt\Provider\LoggerServiceProvider;
@@ -10,15 +11,13 @@ use Bolt\Provider\PathServiceProvider;
 use Bolt\Provider\WhoopsServiceProvider;
 use Cocur\Slugify\Bridge\Silex\SlugifyServiceProvider;
 use Doctrine\DBAL\DBALException;
-use RandomLib;
-use SecurityLib;
 use Silex;
 use Symfony\Component\Stopwatch;
 
 class Application extends Silex\Application
 {
     /**
-     * The default locale, used as fallback.
+     * @deprecated Since 2.3, to be removed in 3.0. Use $app['locale_fallbacks'] instead.
      */
     const DEFAULT_LOCALE = 'en_GB';
 
@@ -59,6 +58,9 @@ class Application extends Silex\Application
         $this['resources']->initialize();
 
         $this['debug'] = $this['config']->get('general/debug', false);
+
+        $locales = (array) $this['config']->get('general/locale');
+        $this['locale'] = reset($locales);
 
         // Initialize the 'editlink' and 'edittitle'.
         $this['editlink'] = '';
@@ -224,76 +226,23 @@ class Application extends Silex\Application
      */
     public function initProfiler()
     {
-        // Register the Silex/Symfony web debug toolbar.
-        $this->register(
-            new Silex\Provider\WebProfilerServiceProvider(),
-            [
-                'profiler.cache_dir'                => $this['resources']->getPath('cache') . '/profiler',
-                'profiler.mount_prefix'             => '/_profiler', // this is the default
-                'web_profiler.debug_toolbar.enable' => false,
-            ]
-        );
-        $this->register(new DebugToolbarEnabler());
-
-        // Register the toolbar item for our Database query log.
-        $this->register(new Provider\DatabaseProfilerServiceProvider());
-
-        // Register the toolbar item for our Bolt nipple.
-        $this->register(new Provider\BoltProfilerServiceProvider());
+        $this->register(new Provider\ProfilerServiceProvider());
     }
 
     public function initLocale()
     {
-        $configLocale = (array) $this['config']->get('general/locale', Application::DEFAULT_LOCALE);
-
-        // $app['locale'] should only be a single value.
-        $this['locale'] = reset($configLocale);
-
-        // Set the default timezone if provided in the Config
-        date_default_timezone_set($this['config']->get('general/timezone') ?: ini_get('date.timezone') ?: 'UTC');
-
-        // for javascript datetime calculations, timezone offset. e.g. "+02:00"
-        $this['timezone_offset'] = date('P');
-
-        // Set default locale, for Bolt
-        $locale = [];
-        foreach ($configLocale as $value) {
-            $locale = array_merge($locale, [
-                $value . '.UTF-8',
-                $value . '.utf8',
-                $value,
-                Application::DEFAULT_LOCALE . '.UTF-8',
-                Application::DEFAULT_LOCALE . '.utf8',
-                Application::DEFAULT_LOCALE,
-                substr(Application::DEFAULT_LOCALE, 0, 2)
-            ]);
-        }
-
-        setlocale(LC_ALL, array_unique($locale));
-
-        $this->register(
-            new Silex\Provider\TranslationServiceProvider(),
-            [
-                'translator.cache_dir' => $this['resources']->getPath('cache/trans'),
-                'locale_fallbacks'     => [Application::DEFAULT_LOCALE]
-            ]
-        );
-
         $this->register(new Provider\TranslationServiceProvider());
     }
 
     public function initProviders()
     {
-        // Set up our secure random generator.
-        $factory = new RandomLib\Factory();
-        $this['randomgenerator'] = $factory->getGenerator(new SecurityLib\Strength(SecurityLib\Strength::MEDIUM));
-
         $this
             ->register(new Silex\Provider\HttpFragmentServiceProvider())
             ->register(new Silex\Provider\UrlGeneratorServiceProvider())
             ->register(new Silex\Provider\ValidatorServiceProvider())
             ->register(new Provider\RoutingServiceProvider())
             ->register(new Silex\Provider\ServiceControllerServiceProvider()) // must be after Routing
+            ->register(new Provider\RandomGeneratorServiceProvider())
             ->register(new Provider\PermissionsServiceProvider())
             ->register(new Provider\StorageServiceProvider())
             ->register(new Provider\QueryServiceProvider())
@@ -336,6 +285,24 @@ class Application extends Silex\Application
     {
         $this['extensions']->checkLocalAutoloader();
         $this['extensions']->initialize();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function mount($prefix, $controllers)
+    {
+        if (!$this->booted) {
+            // Forward call to mount event if we can (which handles prioritization).
+            $this->on(ControllerEvents::MOUNT, function (MountEvent $event) use ($prefix, $controllers) {
+                $event->mount($prefix, $controllers);
+            });
+        } else {
+            // Already missed mounting event just append it to bottom of controller list
+            parent::mount($prefix, $controllers);
+        }
+
+        return $this;
     }
 
     /**
@@ -396,13 +363,13 @@ class Application extends Silex\Application
     /**
      * Generates a path from the given parameters.
      *
-     * Note: This can be pulled in from Silex\Application\UrlGeneratorTrait
-     * once we support Traits.
-     *
      * @param string $route      The name of the route
      * @param array  $parameters An array of parameters
      *
      * @return string The generated path
+     *
+     * @deprecated Since 2.3, to be removed in 3.0.
+     *             Use {@see \Symfony\Component\Routing\Generator\UrlGeneratorInterface} instead.
      */
     public function generatePath($route, $parameters = [])
     {
