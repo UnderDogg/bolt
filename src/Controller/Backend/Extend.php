@@ -200,7 +200,8 @@ class Extend extends BackendBase
         $package = $request->get('package');
         $versions = ['dev' => [], 'stable' => []];
         $info = $this->app['extend.info']->info($package, $this->app['bolt_version']);
-        if (isset($info->version)) {
+
+        if (isset($info->version) && is_array($info->version)) {
             foreach ($info->version as $version) {
                 $versions[$version->stability][] = $version;
             }
@@ -216,7 +217,7 @@ class Extend extends BackendBase
      */
     public function installPackage()
     {
-        return $this->render('extend/install-package.twig', $this->getRenderContext());
+        return $this->render('@bolt/extend/install-package.twig', $this->getRenderContext());
     }
 
     /**
@@ -226,7 +227,7 @@ class Extend extends BackendBase
      */
     public function overview()
     {
-        return $this->render('extend/extend.twig', $this->getRenderContext());
+        return $this->render('@bolt/extend/extend.twig', $this->getRenderContext());
     }
 
     /**

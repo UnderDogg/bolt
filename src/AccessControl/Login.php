@@ -4,6 +4,7 @@ namespace Bolt\AccessControl;
 use Bolt\AccessControl\Token\Token;
 use Bolt\Storage\Entity;
 use Bolt\Translation\Translator as Trans;
+use Carbon\Carbon;
 use Hautelook\Phpass\PasswordHash;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
@@ -74,8 +75,8 @@ class Login extends AccessChecker
     /**
      * Check a user login request for username/password combinations.
      *
-     * @param string  $userName
-     * @param string  $password
+     * @param string $userName
+     * @param string $password
      *
      * @return boolean
      */
@@ -116,11 +117,15 @@ class Login extends AccessChecker
                 return false;
             }
 
-            $this->repositoryAuthtoken->save($userEntity);
+            $userTokenEntity->setLastseen(Carbon::now());
+            $userTokenEntity->setValidity(Carbon::create()->addSeconds($this->cookieOptions['lifetime']));
+            $this->repositoryAuthtoken->save($userTokenEntity);
             $this->flashLogger->success(Trans::__('Session resumed.'));
 
             return $this->loginFinish($userEntity);
         }
+
+        $this->systemLogger->alert(sprintf('Attempt to login with an invalid token from %s', $this->remoteIP), ['event' => 'security']);
 
         return false;
     }
@@ -141,7 +146,8 @@ class Login extends AccessChecker
         }
 
         if (!$userEntity->getEnabled()) {
-            $this->flashLogger->error(Trans::__('Your account is disabled. Sorry about that.'));
+            $this->systemLogger->alert("Attempt to login with disabled account by '$userName'", ['event' => 'security']);
+            $this->flashLogger->error(Trans::__('Your account is disabled. Sorry about that. and stuff'));
 
             return null;
         }
@@ -173,7 +179,7 @@ class Login extends AccessChecker
     }
 
     /**
-     * Add errormessages to logs and update the user
+     * Add error messages to logs and update the user.
      *
      * @param Entity\Users $userEntity
      */
@@ -198,7 +204,7 @@ class Login extends AccessChecker
      */
     protected function updateUserLogin(Entity\Users $userEntity)
     {
-        $userEntity->setLastseen(new \DateTime());
+        $userEntity->setLastseen(Carbon::now());
         $userEntity->setLastip($this->remoteIP);
         $userEntity->setFailedlogins(0);
         $userEntity->setThrottleduntil($this->throttleUntil(0));
@@ -224,7 +230,7 @@ class Login extends AccessChecker
      */
     protected function updateUserShadowLogin(Entity\Users $userEntity)
     {
-        if (new \DateTime() > $userEntity->getShadowvalidity()) {
+        if (Carbon::now() > $userEntity->getShadowvalidity()) {
             $userEntity->setShadowpassword('');
             $userEntity->setShadowtoken('');
             $userEntity->setShadowvalidity(null);
@@ -251,15 +257,13 @@ class Login extends AccessChecker
         $username = $userEntity->getUsername();
         $token = $this->getAuthToken($username, $salt);
         $validityPeriod = $this->cookieOptions['lifetime'];
-        $validityDate = new \DateTime();
-        $validityInterval = new \DateInterval("PT{$validityPeriod}S");
 
         $tokenEntity->setUsername($userEntity->getUsername());
         $tokenEntity->setToken($token);
         $tokenEntity->setSalt($salt);
-        $tokenEntity->setValidity($validityDate->add($validityInterval));
+        $tokenEntity->setValidity(Carbon::create()->addSeconds($validityPeriod));
         $tokenEntity->setIp($this->remoteIP);
-        $tokenEntity->setLastseen(new \DateTime());
+        $tokenEntity->setLastseen(Carbon::now());
         $tokenEntity->setUseragent($this->userAgent);
 
         $this->repositoryAuthtoken->save($tokenEntity);
@@ -290,10 +294,7 @@ class Login extends AccessChecker
         } else {
             $wait = pow(($attempts - 4), 2);
 
-            $dt = new \DateTime();
-            $di = new \DateInterval("PT{$wait}S");
-
-            return $dt->add($di);
+            return Carbon::create()->addSeconds($wait);
         }
     }
 }

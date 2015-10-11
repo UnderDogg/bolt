@@ -375,6 +375,7 @@ class Omnisearch
             ];
 
             if ($withRecord) {
+                $item['slug'] = $result->contenttype['slug'];
                 $item['record'] = $result;
                 $item['permissions'] = $this->app['permissions']->getContentTypeUserPermissions($result->contenttype['slug'], $user);
             }
@@ -407,6 +408,14 @@ class Omnisearch
         return $comparison;
     }
 
+    /**
+     * Helper to generate a route.
+     *
+     * @param string $route
+     * @param array  $parameters
+     *
+     * @return string
+     */
     private function generatePath($route, $parameters = [])
     {
         return $this->app['url_generator']->generate($route, $parameters);

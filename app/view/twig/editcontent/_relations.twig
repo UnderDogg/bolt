@@ -9,19 +9,26 @@
 {% endif %}
 
 {% if context.has.relations %}
-    {% include 'editcontent/_relationships.twig' %}
+    {% include '@bolt/editcontent/_relationships.twig' %}
 {% endif %}
 
 {# Output 'incoming' relations #}
 {% for reltype, ids in context.content.relation %}
     {% if context.contenttype.relations[reltype] is not defined %}
         <p>{{ __('This record is related to:') }}</p>
-        <table class="table table-striped dashboardlisting">
+        <table class="table dashboardlisting buic-listing">
             {% for id in ids %}
                 {% setcontent record = reltype ~ '/' ~ id %}
                 {% if record %}
                     {% set editable = isallowed('edit', record) %}
-                    {% include ['_sub/_listing.twig'] with {'excerptlength': 280, 'thumbsize': 54, 'compact': true, 'content': record} %}
+                    {% set listing_vars = {
+                        'compact':       true,
+                        'content':       record,
+                        'excerptlength': 280,
+                        'permissions':   {},
+                        'thumbsize':     54,
+                    } %}
+                    {% include ['@bolt/_sub/_listing.twig'] with listing_vars %}
                 {% endif %}
             {% endfor %}
         </table>
@@ -29,7 +36,7 @@
 {% endfor %}
 
 {% if context.has.tabs and 'relations' in context.contenttype.groups %}
-    {% include 'editcontent/_fields.twig' %}
+    {% include '@bolt/editcontent/_fields.twig' %}{# TODO doesn't exist #}
 {% endif %}
 
 {% if not context.has.tabs %}

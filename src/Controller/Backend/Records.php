@@ -3,6 +3,7 @@ namespace Bolt\Controller\Backend;
 
 use Bolt\Storage\Entity\Content;
 use Bolt\Translation\Translator as Trans;
+use GuzzleHttp\Psr7\Uri;
 use Silex\ControllerCollection;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -60,14 +61,18 @@ class Records extends BackendBase
 
             if (!$this->isAllowed("contenttype:$contenttypeslug:delete:$id")) {
                 $this->flashes()->error(Trans::__('Permission denied', []));
-            } elseif ($this->checkAntiCSRFToken() && $this->app['storage']->deleteContent($contenttypeslug, $id)) {
+            } elseif ($this->checkAntiCSRFToken() && $this->storage()->deleteContent($contenttypeslug, $id)) {
                 $this->flashes()->info(Trans::__("Content '%title%' has been deleted.", ['%title%' => $title]));
             } else {
                 $this->flashes()->info(Trans::__("Content '%title%' could not be deleted.", ['%title%' => $title]));
             }
         }
 
-        return $this->redirectToRoute('overview', ['contenttypeslug' => $contenttypeslug]);
+        // Get the referer's query parameters
+        $queryParams = $this->getRefererQueryParameters($request);
+        $queryParams['contenttypeslug'] = $contenttypeslug;
+
+        return $this->redirectToRoute('overview', $queryParams);
     }
 
     /**
@@ -122,7 +127,7 @@ class Records extends BackendBase
         $duplicate = $request->query->get('duplicate', false);
         $context = $this->recordModifier()->handleEditRequest($content, $contenttype, $duplicate);
 
-        return $this->render('editcontent/editcontent.twig', $context);
+        return $this->render('@bolt/editcontent/editcontent.twig', $context);
     }
 
     /**
@@ -140,7 +145,7 @@ class Records extends BackendBase
             return $this->delete($request, $contenttypeslug, $id);
         }
 
-        // This shoudln't happen
+        // This shouldn't happen
         if (!$this->getContentType($contenttypeslug)) {
             $this->flashes()->error(Trans::__('Attempt to modify invalid Contenttype.'));
 
@@ -159,31 +164,37 @@ class Records extends BackendBase
             'held'    => 'depublish',
             'draft'   => 'depublish',
         ];
+        // Get the referer's query parameters
+        $queryParams = $this->getRefererQueryParameters($request);
+        $queryParams['contenttypeslug'] = $contenttypeslug;
 
         if (!isset($actionStatuses[$action])) {
             $this->flashes()->error(Trans::__('No such action for content.'));
 
-            return $this->redirectToRoute('overview', ['contenttypeslug' => $contenttypeslug]);
+            return $this->redirectToRoute('overview', $queryParams);
         }
 
         $newStatus = $actionStatuses[$action];
-        $content = $this->getContent("$contenttypeslug/$id");
-        $title = $content->getTitle();
+        $repo = $this->storage()->getRepository($contenttypeslug);
+        $record = $repo->find($id);
+        $title = $record->getTitle();
+        $canModify = $this->isAllowed("contenttype:$contenttypeslug:{$actionPermissions[$action]}:$id");
+        $canTransition = $this->users()->isContentStatusTransitionAllowed($record->getStatus(), $newStatus, $contenttypeslug, $id);
 
-        if (!$this->isAllowed("contenttype:$contenttypeslug:{$actionPermissions[$action]}:$id") ||
-        !$this->users()->isContentStatusTransitionAllowed($content['status'], $newStatus, $contenttypeslug, $id)) {
+        if (!$canModify || !$canTransition) {
             $this->flashes()->error(Trans::__('You do not have the right privileges to %ACTION% that record.', ['%ACTION%' => $actionPermissions[$action]]));
 
-            return $this->redirectToRoute('overview', ['contenttypeslug' => $contenttypeslug]);
+            return $this->redirectToRoute('overview', $queryParams);
         }
 
-        if ($this->app['storage']->updateSingleValue($contenttypeslug, $id, 'status', $newStatus)) {
+        $record->setStatus($newStatus);
+        if ($repo->save($record)) {
             $this->flashes()->info(Trans::__("Content '%title%' has been changed to '%newStatus%'", ['%title%' => $title, '%newStatus%' => $newStatus]));
         } else {
             $this->flashes()->info(Trans::__("Content '%title%' could not be modified.", ['%title%' => $title]));
         }
 
-        return $this->redirectToRoute('overview', ['contenttypeslug' => $contenttypeslug]);
+        return $this->redirectToRoute('overview', $queryParams);
     }
 
     /**
@@ -243,7 +254,7 @@ class Records extends BackendBase
             'permissions'     => $this->getContentTypeUserPermissions($contenttypeslug, $this->users()->getCurrentUser())
         ];
 
-        return $this->render('overview/overview.twig', $context);
+        return $this->render('@bolt/overview/overview.twig', $context);
     }
 
     /**
@@ -307,7 +318,7 @@ class Records extends BackendBase
             'permissions'      => $this->getContentTypeUserPermissions($contenttypeslug, $this->users()->getCurrentUser())
         ];
 
-        return $this->render('relatedto/relatedto.twig', $context);
+        return $this->render('@bolt/relatedto/relatedto.twig', $context);
     }
 
     /**

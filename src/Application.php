@@ -29,7 +29,7 @@ class Application extends Silex\Application
         $values['bolt_version'] = '2.3.0';
         $values['bolt_name'] = 'alpha 2';
         $values['bolt_released'] = false; // `true` for stable releases, `false` for alpha, beta and RC.
-        $values['bolt_long_version'] = function($app) {
+        $values['bolt_long_version'] = function ($app) {
             return $app['bolt_version'] . ' ' . $app['bolt_name'];
         };
 
@@ -192,10 +192,7 @@ class Application extends Silex\Application
     public function initRendering()
     {
         $this->register(new Provider\TwigServiceProvider());
-        $this->register(new Provider\SafeTwigServiceProvider());
-
         $this->register(new Provider\RenderServiceProvider());
-        $this->register(new Provider\RenderServiceProvider(true));
     }
 
     /**

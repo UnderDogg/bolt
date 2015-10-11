@@ -102,7 +102,7 @@ class RecordHandler
      * Create an excerpt for the given content.
      *
      * @param \Bolt\Legacy\Content|array|string $content
-     * @param integer                    $length  Defaults to 200 characters
+     * @param integer                           $length  Defaults to 200 characters
      *
      * @return string Resulting excerpt
      */
@@ -249,7 +249,7 @@ class RecordHandler
         /* Little hack to avoid doubling this function and having context without breaking frontend */
         if ($template == 'backend') {
             $context = ['context' => $context];
-            $template = 'components/pager.twig';
+            $template = '@bolt/components/pager.twig';
         }
 
         return new \Twig_Markup($env->render($template, $context), 'utf-8');
@@ -273,7 +273,7 @@ class RecordHandler
             $retval = [''];
         }
 
-        if(!empty($content)) {
+        if (!empty($content)) {
             foreach ($content as $c) {
                 if (is_array($fieldname)) {
                     $row = [];

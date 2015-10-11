@@ -3,6 +3,7 @@ namespace Bolt\Controller;
 
 use Bolt\Routing\DefaultControllerClassAwareInterface;
 use Bolt\Storage\Entity;
+use Doctrine\DBAL\Exception\TableNotFoundException;
 use Silex\Application;
 use Silex\ControllerCollection;
 use Silex\ControllerProviderInterface;
@@ -11,6 +12,7 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormTypeInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 /**
@@ -233,6 +235,25 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
+     * Check to see if the user table exists and has records.
+     *
+     * @return boolean
+     */
+    protected function hasUsers()
+    {
+        try {
+            $users = $this->app['users']->getUsers();
+            if (empty($users)) {
+                return false;
+            }
+
+            return true;
+        } catch (TableNotFoundException $e) {
+            return false;
+        }
+    }
+
+    /**
      * Return current user or user by ID.
      *
      * @param integer|string|null $userId
@@ -250,7 +271,7 @@ abstract class Base implements ControllerProviderInterface
             return;
         }
 
-        $repo = $this->app['storage']->getRepository('Bolt\Storage\Entity\Users');
+        $repo = $this->storage()->getRepository('Bolt\Storage\Entity\Users');
         if (($userEntity = $repo->getUser($userId)) && !$raw) {
             $userEntity->setPassword('**dontchange**');
         }
@@ -286,7 +307,7 @@ abstract class Base implements ControllerProviderInterface
      */
     protected function getRepository($repository)
     {
-        return $this->app['storage']->getRepository($repository);
+        return $this->storage()->getRepository($repository);
     }
 
     /**
@@ -301,7 +322,7 @@ abstract class Base implements ControllerProviderInterface
      */
     protected function getContent($textquery, $parameters = [], &$pager = [], $whereparameters = [])
     {
-        return $this->app['storage']->getContent($textquery, $parameters, $pager, $whereparameters);
+        return $this->storage()->getContent($textquery, $parameters, $pager, $whereparameters);
     }
 
     /**
@@ -313,7 +334,7 @@ abstract class Base implements ControllerProviderInterface
      */
     protected function getContentType($slug)
     {
-        return $this->app['storage']->getContentType($slug);
+        return $this->storage()->getContentType($slug);
     }
 
     /**
@@ -327,6 +348,21 @@ abstract class Base implements ControllerProviderInterface
     protected function getOption($path, $default = null)
     {
         return $this->app['config']->get($path, $default);
+    }
+
+    /**
+     * Get an array of query parameters used in the request.
+     *
+     * @param Request $request
+     *
+     * @return array
+     */
+    protected function getRefererQueryParameters(Request $request)
+    {
+        $referer = $request->server->get('HTTP_REFERER');
+        $request = Request::create($referer);
+
+        return (array) $request->query->getIterator();
     }
 
     /**

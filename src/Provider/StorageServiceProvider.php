@@ -4,8 +4,8 @@ namespace Bolt\Provider;
 use Bolt\EventListener\StorageEventListener;
 use Bolt\Legacy\Storage;
 use Bolt\Storage\ContentLegacyService;
-use Bolt\Storage\EntityManager;
 use Bolt\Storage\Entity\Builder;
+use Bolt\Storage\EntityManager;
 use Bolt\Storage\Field\Type\TemplateFieldsType;
 use Bolt\Storage\FieldManager;
 use Bolt\Storage\Mapping\MetadataDriver;
@@ -161,7 +161,11 @@ class StorageServiceProvider implements ServiceProviderInterface
         );
 
         $app['storage.listener'] = $app->share(function () use ($app) {
-            return new StorageEventListener($app['storage'], $app['access_control.hash.strength']);
+            return new StorageEventListener(
+                $app['storage'],
+                $app['config'],
+                $app['access_control.hash.strength']
+            );
         });
 
         $app['storage.namingstrategy'] = $app->share(

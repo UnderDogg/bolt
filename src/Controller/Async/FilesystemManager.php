@@ -98,7 +98,7 @@ class FilesystemManager extends AsyncBase
             'key'          => $key
         ];
 
-        return $this->render('files_async/files_async.twig',
+        return $this->render('@bolt/files_async/files_async.twig',
             ['context' => $context],
             ['title', Trans::__('Files in %s', ['%s' => $path])]
         );
@@ -231,7 +231,7 @@ class FilesystemManager extends AsyncBase
     {
         $results = [];
 
-        foreach ($this->app['storage']->getContentTypes() as $contenttype) {
+        foreach ($this->storage()->getContentTypes() as $contenttype) {
             $records = $this->getContent($contenttype, ['published' => true, 'hydrate' => false]);
 
             foreach ($records as $record) {
@@ -247,7 +247,7 @@ class FilesystemManager extends AsyncBase
             'results' => $results,
         ];
 
-        return $this->render('recordbrowser/recordbrowser.twig', ['context' => $context]);
+        return $this->render('@bolt/recordbrowser/recordbrowser.twig', ['context' => $context]);
     }
 
     /**

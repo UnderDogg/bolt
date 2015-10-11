@@ -57,7 +57,7 @@ class General extends BackendBase
      */
     public function about()
     {
-        return $this->render('about/about.twig');
+        return $this->render('@bolt/about/about.twig');
     }
 
     /**
@@ -67,7 +67,7 @@ class General extends BackendBase
      */
     public function checks()
     {
-        return $this->render('checks/checks.twig');
+        return $this->render('@bolt/checks/checks.twig');
     }
 
     /**
@@ -88,7 +88,7 @@ class General extends BackendBase
             $this->flashes()->success($output);
         }
 
-        return $this->render('clearcache/clearcache.twig');
+        return $this->render('@bolt/clearcache/clearcache.twig');
     }
 
     /**
@@ -98,7 +98,7 @@ class General extends BackendBase
      */
     public function dashboard()
     {
-        return $this->render('dashboard/dashboard.twig', $this->getLatest());
+        return $this->render('@bolt/dashboard/dashboard.twig', $this->getLatest());
     }
 
     /**
@@ -111,18 +111,36 @@ class General extends BackendBase
     public function omnisearch(Request $request)
     {
         $query = $request->query->get('q', '');
-        $results = [];
+        $records = [];
+        $files = [];
 
         if (strlen($query) >= 3) {
-            $results = $this->app['omnisearch']->query($query, true);
+            $pathSearch = $this->app['resources']->getUrl('bolt') . 'omnisearch';
+            $pathEdit = $this->app['resources']->getUrl('bolt') . 'file/edit/';
+
+            foreach ($this->app['omnisearch']->query($query, true) as $result) {
+                if (isset($result['slug'])) {
+                    $records[$result['slug']][] = [
+                        'record' => $result['record'],
+                        'permissions' => $result['permissions'],
+                    ];
+                } elseif (substr($result['path'], 0, strlen($pathEdit)) === $pathEdit) {
+                    $result['file'] = substr($result['path'], strlen($pathEdit));
+                    $files[] = $result;
+                } elseif (substr($result['path'], 0, strlen($pathSearch)) != $pathSearch) {
+                    $result['file'] = basename($result['path']);
+                    $files[] = $result;
+                }
+            }
         }
 
         $context = [
             'query'   => $query,
-            'results' => $results
+            'records' => $records,
+            'files' => $files,
         ];
 
-        return $this->render('omnisearch/omnisearch.twig', $context);
+        return $this->render('@bolt/omnisearch/omnisearch.twig', $context);
     }
 
     /**
@@ -156,7 +174,7 @@ class General extends BackendBase
             $contenttypes = $form->get('contenttypes')->getData();
 
             try {
-                $content = $this->app['storage']->preFill($contenttypes);
+                $content = $this->storage()->preFill($contenttypes);
                 $this->flashes()->success($content);
             } catch (RequestException $e) {
                 $msg = "Timeout attempting to the 'Lorem Ipsum' generator. Unable to add dummy content.";
@@ -172,7 +190,7 @@ class General extends BackendBase
             'form'         => $form->createView(),
         ];
 
-        return $this->render('prefill/prefill.twig', $context);
+        return $this->render('@bolt/prefill/prefill.twig', $context);
     }
 
     /**
@@ -220,7 +238,7 @@ class General extends BackendBase
             'write_allowed' => $tr['writeallowed'],
         ];
 
-        return $this->render('editlocale/editlocale.twig', $context);
+        return $this->render('@bolt/editlocale/editlocale.twig', $context);
     }
 
     /**

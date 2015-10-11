@@ -67,7 +67,6 @@
 "Code:": "Code:"
 "Collapse sidebar": "Collapse sidebar"
 "Configuration": "Configuration"
-"Configure Extensions": "Configure Extensions"
 "Content '%title%' could not be deleted.": "Content '%title%' could not be deleted."
 "Content '%title%' could not be modified.": "Content '%title%' could not be modified."
 "Content '%title%' has been changed to '%newStatus%'": "Content '%title%' has been changed to '%newStatus%'"
@@ -170,7 +169,7 @@
 "Next": "Next"
 "No recent %contenttype%.": "No recent %contenttype%."
 "No relations found!": "No relations found!"
-"No results found for '%search%'. Please try another search.": "No results found for '%search%'. Please try another search."
+"No results found for '%SEARCHTERM%'. Please try another search.": "No results found for '%SEARCHTERM%'. Please try another search."
 "No such action for content.": "No such action for content."
 "No such action for user '%s'.": "No such action for user '%s'."
 "None": "None"
@@ -315,7 +314,7 @@
 "View related content": "View related content"
 "View site": "View site"
 "View/edit Templates": "View/edit Templates"
-"View/install Extensions": "View/install Extensions"
+"Extensions": "Extensions"
 "Warning": "Warning"
 "We were unable to generate the theme. It is likely that your theme directory is not writable by Bolt. Check the permissions and try reinstalling.": "reinstalling.\""
 "Written by <em>%name%</em> on %date%": "Written by <em>%name%</em> on %date%"
@@ -472,6 +471,10 @@ field:
             markedview: "Markdown"
             preview: "Preview"
     slug:
+        button:
+            edit: "Edit"
+            lock: "Lock"
+            unlock: "Unlock"
         message:
             set: "Set the slug to:"
             unlock: "Are you sure you wish to unlock the slug? This might break existing links to this record."

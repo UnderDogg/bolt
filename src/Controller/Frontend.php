@@ -49,12 +49,12 @@ class Frontend extends ConfigurableBase
         // Start the 'stopwatch' for the profiler.
         $this->app['stopwatch']->start('bolt.frontend.before');
 
-        // If there are no users in the users table, or the table doesn't exist. Repair
-        // the DB, and let's add a new user.
-        if (!$this->app['users']->getUsers()) {
+        // If there are no users in the users table, or the table doesn't exist.
+        // Repair the DB, and let's add a new user.
+        if (!$this->hasUsers()) {
             $this->flashes()->info(Trans::__('There are no users in the database. Please create the first user.'));
 
-            return $this->redirectToRoute('useredit', ['id' => '']);
+            return $this->redirectToRoute('userfirst');
         }
 
         // If we are in maintenance mode and current user is not logged in, show maintenance notice.
@@ -188,7 +188,7 @@ class Frontend extends ConfigurableBase
         $contenttype = $this->getContentType($contenttypeslug);
 
         // First, get the preview from Post.
-        $content = $this->app['storage']->getContentObject($contenttypeslug);
+        $content = $this->storage()->getContentObject($contenttypeslug);
         $content->setFromPost($request->request->all(), $contenttype);
 
         $liveEditor = $request->get('_live-editor-preview');
@@ -299,9 +299,9 @@ class Frontend extends ConfigurableBase
      *
      * @return BoltResponse|false
      */
-    public function taxonomy($request, $taxonomytype, $slug)
+    public function taxonomy(Request $request, $taxonomytype, $slug)
     {
-        $taxonomy = $this->app['storage']->getTaxonomyType($taxonomytype);
+        $taxonomy = $this->storage()->getTaxonomyType($taxonomytype);
         // No taxonomytype, no possible content.
         if (empty($taxonomy)) {
             return false;
@@ -317,18 +317,12 @@ class Frontend extends ConfigurableBase
         // Theme value takes precedence over default config @see https://github.com/bolt/bolt/issues/3951
         $amount = $this->getOption('theme/listing_records', false) ?: $this->getOption('general/listing_records');
         $order = $this->getOption('theme/listing_sort', false) ?: $this->getOption('general/listing_sort');
-        $content = $this->app['storage']->getContentByTaxonomy($taxonomytype, $slug, ['limit' => $amount, 'order' => $order, 'page' => $page]);
+        $content = $this->storage()->getContentByTaxonomy($taxonomytype, $slug, ['limit' => $amount, 'order' => $order, 'page' => $page]);
 
-        // @see https://github.com/bolt/bolt/pull/2310
-        if (
-                ($taxonomy['behaves_like'] === 'tags' && !$content) ||
-                (
-                    in_array($taxonomy['behaves_like'], ['categories', 'grouping']) &&
-                    !in_array($slug, isset($taxonomy['options']) ? array_keys($taxonomy['options']) : [])
-                )
-            ) {
+        if (!$this->isTaxonomyValid($content, $slug, $taxonomy)) {
             $this->abort(Response::HTTP_NOT_FOUND, "No slug '$slug' in taxonomy '$taxonomyslug'");
-            return null;
+
+            return;
         }
 
         $template = $this->templateChooser()->taxonomy($taxonomyslug);
@@ -355,6 +349,33 @@ class Frontend extends ConfigurableBase
         ];
 
         return $this->render($template, [], $globals);
+    }
+
+    /**
+     * Check if the taxonomy is valid.
+     *
+     * @see https://github.com/bolt/bolt/pull/2310
+     *
+     * @param Content $content
+     * @param string  $slug
+     * @param array   $taxonomy
+     *
+     * @return boolean
+     */
+    protected function isTaxonomyValid($content, $slug, array $taxonomy)
+    {
+        if ($taxonomy['behaves_like'] === 'tags' && !$content) {
+            return false;
+        }
+
+        $isNotTag = in_array($taxonomy['behaves_like'], ['categories', 'grouping']);
+        $options = isset($taxonomy['options']) ? array_keys($taxonomy['options']) : [];
+        $isTax = in_array($slug, $options);
+        if ($isNotTag && !$isTax) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -410,7 +431,7 @@ class Frontend extends ConfigurableBase
             $filters = null;
         }
 
-        $result = $this->app['storage']->searchContent($q, $contenttypes, $filters, $limit, $offset);
+        $result = $this->storage()->searchContent($q, $contenttypes, $filters, $limit, $offset);
 
         $pager = [
             'for'          => $context,
@@ -422,7 +443,7 @@ class Frontend extends ConfigurableBase
             'link'         => $this->generateUrl('search', ['q' => $q]) . '&page_search='
         ];
 
-        $this->app['storage']->setPager($context, $pager);
+        $this->storage()->setPager($context, $pager);
 
         $globals = [
             'records'      => $result['results'],

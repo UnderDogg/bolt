@@ -1,9 +1,6 @@
 <?php
 namespace Bolt\Storage\Database\Schema\Table;
 
-use Doctrine\DBAL\Platforms\PostgreSqlPlatform;
-use Doctrine\DBAL\Platforms\SqlitePlatform;
-
 class ContentType extends BaseTable
 {
     /** @var array Mapping of field type to column type function */
@@ -90,6 +87,10 @@ class ContentType extends BaseTable
     public function ignoredChanges()
     {
         $ignoredChanges = [
+            ['column' => 'datecreated', 'property' => 'type'],
+            ['column' => 'datechanged', 'property' => 'type'],
+            ['column' => 'datepublish', 'property' => 'type'],
+            ['column' => 'datedepublish', 'property' => 'type'],
             ['column' => 'templatefields', 'property' => 'type'],
         ];
 
@@ -123,7 +124,7 @@ class ContentType extends BaseTable
             $this->table->addIndex([$fieldName]);
         }
 
-        if ($this->typeMap[$type] === 'columnJson') {
+        if ($this->typeMap[$type] === 'columnDate' || $this->typeMap[$type] === 'columnDateTime' || $this->typeMap[$type] === 'columnJson') {
             $this->ignoredChanges[] = ['column' => $fieldName, 'property' => 'type'];
         }
     }
@@ -232,19 +233,5 @@ class ContentType extends BaseTable
     private function columnText($fieldName)
     {
         $this->table->addColumn($fieldName, 'text', ['default' => $this->getTextDefault()]);
-    }
-
-    /**
-     * Default value for TEXT fields, differs per platform.
-     *
-     * @return string|null
-     */
-    private function getTextDefault()
-    {
-        if ($this->platform instanceof SqlitePlatform || $this->platform instanceof PostgreSqlPlatform) {
-            return '';
-        }
-
-        return null;
     }
 }
